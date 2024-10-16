@@ -1,138 +1,159 @@
-<<<<<<< HEAD
 import socket
 import pymongo
+import hashlib
 
-class Application():
+connection = pymongo.MongoClient("localhost", 27017)
+db = connection['vote_app']
+users_collection = db['users']
+candidates_collection = db['candidates']
+
+
+class TCPserver:
     def __init__(self):
-        self.ip = "localhost"
-        self.port = 9999
-    def db_connect(self):
-        self.connection = pymongo.MongoClient("localhost",27017)
-        self.db = self.connection["db"]
-        self.col = self.db["user_info"]
+        self.server_ip = "localhost"
+        self.server_port = 8080
 
     def main(self):
-        server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        server.bind((self.ip,self.port))
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((self.server_ip, self.server_port))
         server.listen()
-        print("server is listen on {}:{}".format(self.ip,self.port))
-        self.db_connect()
-        while True:
-            try:
-                client,address = server.accept()
-                print("Client {}:{} is connected".format(address[0],address[1]))
-                self.client_hadling(client)
-            except Exception as err:
-                print(err)
-    def client_hadling(self,client_socket):
-        with client_socket as sock:
-            recv = sock.recv(1024)
-            request = recv.decode("utf-8")
-            if request == "reg":
-                sock.send(bytes("Well Recived Command!!", "utf-8"))
-                self.register(sock)
-            else:
-                sock.send(bytes("Unknown Command!!","utf-8"))
-
-    def register(self,sock):
-        sock.send(bytes("Email: ","utf-8"))
-        recv = sock.recv(1024)
-        email = recv.decode("utf-8")
-        check = self.email_check(email,sock)
-        if check == 0:
-            sock.send(bytes("Name: ","utf-8"))
-            recv = sock.recv(1024)
-            name = recv.decode("utf-8")
-            db = self.col.find()
-            id = 0
-            for data in db:
-                id = data["_id"]
-            id+=1
-            self.col.insert_one({"_id":id ,"email": email, "name": name})
-            sock.send(bytes("Registration successful!", "utf-8"))
-        elif check == 1:
-            sock.send(bytes("Email Has Registered!!","utf-8"))
-
-    def email_check(self,email,sock):
-        if self.col.find_one({"email": email}):
-            return 1
-        return 0
-
-if __name__ == "__main__":
-    app = Application()
-    app.main()
-=======
-import socket
-import pymongo
-
-connection = pymongo.MongoClient("localhost",27017)
-db = connection["db"]
-voter = db["voter"]
-candidate  = db["candidate"]
-class TCPserver():
-    def __init__(self):
-        self.ip = "localhost"
-        self.port = 9997
-
-    def main(self):
-        server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        server.bind((self.ip,self.port))
-        server.listen()
-        print("Server is listening on {}:{}".format(self.ip, self.port))
+        print("Server listening on port: {} and IP: {}".format(self.server_port, self.server_ip))
         try:
             while True:
                 client, address = server.accept()
-                print("Client {}:{} is connected".format(address[0], address[1]))
+                print("Accepted connection from {}:{}".format(address[0], address[1]))
                 self.handle_client(client)
         except Exception as err:
-            print(err)
-    def handle_client(self,client_socket):
+            print("Error: ", err)
+
+    def handle_client(self, client_socket):
+        with client_socket as sock:
+            request = sock.recv(1024).decode("utf-8")
+            print("Received: {}".format(request))
+
+            if request.startswith("register"):
+                self.register(sock, request)
+            elif request.startswith("login"):
+                self.login(sock, request)
+            elif request.startswith("vote"):
+                self.vote(sock, request)
+            elif request.startswith("view_candidates"):
+                self.view_candidates(sock)
+            elif request.startswith("admin"):
+                self.handle_admin(sock, request)
+
+    def hash_password(self, password):
+        """Hashes the password using SHA-256."""
+        return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
+    def register(self, sock, request):
+        """Handles user registration for both voters and admins."""
         try:
-            with client_socket as self.sock:
-                self.sock.send(bytes("Welcome!!", "utf-8"))
-                command = self.sock.recv(1024).decode("utf-8")
-                if command == "reg":
-                    self.sock.send(bytes("1||Your In Register Process", "utf-8"))
-                    self.register()
-                elif command == "log":
-                    self.sock.send(bytes("2||Well Recv Command", "utf-8"))
-                elif command == "stop":
-                    self.sock.send(bytes("3||Well Recv Command", "utf-8"))
-                else:
-                    self.sock.send(bytes("0||Unknown Command", "utf-8"))
+            _, username, password, role = request.split("|")
+            if users_collection.find_one({"username": username}):
+                sock.send("User already exists. Please try again.".encode("utf-8"))
+                return
+
+            hashed_pw = self.hash_password(password)
+            users_collection.insert_one({"username": username, "password": hashed_pw, "role": role, "has_voted": False})
+            sock.send("Registration successful.".encode("utf-8"))
         except Exception as err:
-            print(err)
+            sock.send(f"Registration failed: {err}".encode("utf-8"))
 
-    def register(self):
-        self.sock.send(bytes("\nreg for voter: 'regv' & reg for candidate: 'regc'", "utf-8"))
-        command = self.sock.recv(1024).decode("utf-8")
-        if command == "regv":
-            self.sock.send(bytes("1||This is register for voters","utf-8"))
-            email = self.sock.recv(1024).decode("utf-8")
-            result = self.data_checker(email,"email",voter)
-            if result == -1:
-                self.sock.send(bytes("\nEmail Is Already Registered", "utf-8"))
-                self.register()
-            elif result == 0:
-                pass
-        #         continue register
+    def login(self, sock, request):
+        """Validates user credentials and retrieves user role."""
+        try:
+            _, username, password = request.split("|")
+            user = users_collection.find_one({"username": username})
+            if not user:
+                sock.send("User does not exist. Please register.".encode("utf-8"))
+                return
 
-        elif command == "regc":
-            self.sock.send(bytes("2||This is register for candidate", "utf-8"))
-        else:
-            self.sock.send(bytes("0||Unknown Command", "utf-8"))
+            hashed_pw = self.hash_password(password)
+            if user["password"] == hashed_pw:
+                sock.send(f"Login successful|{user['role']}".encode("utf-8"))
+            else:
+                sock.send("Invalid credentials. Please try again.".encode("utf-8"))
+        except Exception as err:
+            sock.send(f"Login failed: {err}".encode("utf-8"))
 
-    def data_checker(self,data,d_name,col):
-        result = 0
-        db = col.find()
-        for i in db:
-            if data == i[d_name]:
-                result = -1
-                break
-        return result
+    def view_candidates(self, sock):
+        """Allows voters to view the list of candidates."""
+        try:
+            candidates = list(candidates_collection.find({}))  # Convert cursor to list
+            if not candidates:  # Check if the list is empty
+                sock.send("No candidates available.".encode("utf-8"))
+                return
+
+            result = "Current Candidates:\n"
+            for candidate in candidates:
+                result += f"{candidate['name']}: {candidate['votes']} votes\n"
+            sock.send(result.encode("utf-8"))
+        except Exception as err:
+            sock.send(f"Failed to retrieve candidates: {err}".encode("utf-8"))
+
+    def vote(self, sock, request):
+        """Handles voting by a user for a specific candidate."""
+        try:
+            _, username, candidate_name = request.split("|")
+            user = users_collection.find_one({"username": username})
+
+            if user is None:
+                sock.send("User not found. Please login first.".encode("utf-8"))
+                return
+
+            if user.get("has_voted"):
+                sock.send("You have already voted.".encode("utf-8"))
+                return
+
+            candidate = candidates_collection.find_one({"name": candidate_name})
+            if candidate:
+                candidates_collection.update_one({"name": candidate_name}, {"$inc": {"votes": 1}})
+                users_collection.update_one({"username": username}, {"$set": {"has_voted": True}})
+                sock.send("Vote successful.".encode("utf-8"))
+            else:
+                sock.send(f"Candidate {candidate_name} not found.".encode("utf-8"))
+        except Exception as err:
+            sock.send(f"Voting failed: {err}".encode("utf-8"))
+
+    def handle_admin(self, sock, request):
+        """Handles admin actions such as adding/removing candidates."""
+        try:
+            action, username, *args = request.split("|")
+            user = users_collection.find_one({"username": username})
+
+            if user is None or user["role"] != "admin":
+                sock.send("Access denied. Admins only.".encode("utf-8"))
+                return
+
+            if action == "1":  # Add candidate
+                candidate_name = args[0] if args else ""
+                candidates_collection.insert_one({"name": candidate_name, "votes": 0})
+                sock.send(f"Candidate {candidate_name} added.".encode("utf-8"))
+
+            elif action == "2":  # Remove candidate
+                candidate_name = args[0] if args else ""
+                result = candidates_collection.delete_one({"name": candidate_name})
+                if result.deleted_count > 0:
+                    sock.send(f"Candidate {candidate_name} removed.".encode("utf-8"))
+                else:
+                    sock.send(f"Candidate {candidate_name} not found.".encode("utf-8"))
+
+            elif action == "3":  # View candidates
+                candidates = list(candidates_collection.find({}))
+                if not candidates:
+                    sock.send("No candidates available.".encode("utf-8"))
+                    return
+
+                result = "Current Candidates:\n"
+                for candidate in candidates:
+                    result += f"{candidate['name']}: {candidate['votes']} votes\n"
+                sock.send(result.encode("utf-8"))
+
+        except Exception as err:
+            sock.send(f"Admin action failed: {err}".encode("utf-8"))
 
 
-if __name__=="__main__":
-    server = TCPserver()
-    server.main()
->>>>>>> master
+if __name__ == "__main__":
+    tcpserver = TCPserver()
+    tcpserver.main()
