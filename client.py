@@ -1,146 +1,106 @@
-<<<<<<< HEAD
 import socket
 
-class User():
-    def __init__(self):
-        self.ip = "localhost"
-        self.port = 9999
-
-    def main(self):
-        client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        client.connect((self.ip,self.port))
-        try:
-            command = input("Enter Command: ")
-            to_send_server = bytes(command, "utf-8")
-            client.send(to_send_server)
-            recv = client.recv(1024)
-            reply = recv.decode()
-            if reply == "Well Recived Command!!":
-                print(reply)
-                self.register(client)
-            else:
-                print(reply)
-        except Exception as err:
-             print(err)
-    def register(self,sock):
-        recv = sock.recv(1024)
-        reply = recv.decode()
-        email = input(reply)
-        to_send_server = bytes(email, "utf-8")
-        sock.send(to_send_server)
-        recv = sock.recv(1024)
-        reply = recv.decode()
-        if reply == "Email Has Registered!!":
-            print(reply)
-            self.main()
-        else:
-            name = input(reply)
-            to_send_server = bytes(name, "utf-8")
-            sock.send(to_send_server)
-            recv = sock.recv(1024)
-            reply = recv.decode()
-            print(reply)
-if __name__ == "__main__":
-    while True:
-        app = User()
-        app.main()
-
-
-
-
-
-
-
-
-
-
-
-=======
-import socket
 
 class TCPclient():
-    def __init__(self):
-        self.ip = "localhost"
-        self.port = 9997
+    def __init__(self, sms):
+        self.target_ip = "localhost"
+        self.target_port = 8080
+        self.client_sms = bytes(sms, "utf-8")
 
     def run_client(self):
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect((self.ip, self.port))
-        return client
-
-    def main_menu(self):
-        self.client = self.run_client()
-        reply = self.client.recv(1024).decode("utf-8")
-        print(reply)
-        try:
-            command:str = input("Enter Command: ")
-            self.client.send(bytes(command,"utf-8"))
-            process,reply = self.client.recv(1024).decode("utf-8").split("||")
-            print(reply)
-            if process == "1":
-                self.register()
-            elif process == "2":
-                pass
-            elif process == "3":
-                pass
-        except Exception as err:
-            print(err)
-
-    def register(self):
-        reply = self.client.recv(1024).decode("utf-8")
-        print(reply)
-        command: str = input("Enter Command: ")
-        self.client.send(bytes(command,"utf-8"))
-        process, reply = self.client.recv(1024).decode("utf-8").split("||")
-        if process == "1":
-            print(reply)
-            self.voter_register()
-        elif process == "2":
-            print(reply)
-
-    def voter_register(self):
-        email:str = input("Enter Email To Register:")
-        result = self.email_checker(email)
-        if result ==  1:
-            self.client.send(bytes(email, "utf-8"))
-        #     continue register
-        else:
-            print("\nEmail Format Worng!!")
-            self.register()
-
-    def email_checker(self,email):
-        name_counter = 0
-        for i in range(len(email)):
-            if email[i] == '@':
-                break
-            name_counter += 1
-
-        email_name = email[0:name_counter]
-        email_form = email[name_counter:]
-
-        name_flag = 0
-        email_flag = -1
-        domain_form = ["@facebook.com", "@ncc.com", "@mail.ru", "@yahoo.com", "@outlook.com", "@apple.com", "@zoho.com",
-                       "@gmail.com"]
-        for i in email_name:
-            if (31 < ord(i) < 48) or (57 < ord(i) < 65) or (90 < ord(i) < 97) or (122 < ord(i) < 128):
-                name_flag = -1
-                break
-
-        for i in domain_form:
-            if email_form == i:
-                email_flag = 0
-                break
-
-        if name_flag == -1 or email_flag == -1:
-            return -1
-
-        else:
-            return 0
+        client.connect((self.target_ip, self.target_port))
+        client.send(self.client_sms)
+        received_reply = client.recv(1024).decode("utf-8")
+        print("Server Response: ", received_reply)
+        client.close()
+        return received_reply
 
 
 if __name__ == "__main__":
+    role = None
+    username = None
+
     while True:
-        client = TCPclient()
-        client.main_menu()
->>>>>>> master
+        print("\n1: Register\n2: Login\n3: Exit")
+        choice = input("Choose an action: ")
+
+        if choice == '1':
+            # Register
+            username = input("Enter your username: ")
+            password = input("Enter your password: ")
+            role = input("Enter role (admin/voter): ")
+
+            message = f"register|{username}|{password}|{role}"
+            reply = TCPclient(message).run_client()
+            if "Registration successful" in reply:
+                print("Registration successful, you can now login.")
+            else:
+                print(reply)
+
+        elif choice == '2':
+            # Login
+            username = input("Enter your username: ")
+            password = input("Enter your password: ")
+
+            message = f"login|{username}|{password}"
+            reply = TCPclient(message).run_client()
+
+            # Parse the server response to extract the role
+            if "Login successful" in reply:
+                role = reply.split('|')[-1]
+                print(f"Welcome, {username}. You are logged in as {role}.")
+
+                # Displaying admin options or voting options based on the role
+                while True:
+                    if role == "admin":
+                        print("\n1: View Candidates\n2: Add Candidate\n3: Remove Candidate\n4: Logout")
+                        admin_choice = input("Choose an action: ")
+                        if admin_choice == '1':
+                            message = f"admin|{username}|view|"
+                            reply = TCPclient(message).run_client()
+                            print(reply)  # Display candidates or response
+                        elif admin_choice == '2':
+                            candidate_name = input("Enter candidate name: ")
+                            message = f"admin|{username}|add|{candidate_name}"
+                            reply = TCPclient(message).run_client()
+                            print(reply)  # Display response
+                        elif admin_choice == '3':
+                            candidate_name = input("Enter candidate name to remove: ")
+                            message = f"admin|{username}|remove|{candidate_name}"
+                            reply = TCPclient(message).run_client()
+                            print(reply)  # Display response
+                        elif admin_choice == '4':
+                            print("Logging out...")
+                            break
+                        else:
+                            print("Invalid option. Please choose again.")
+                    else:  # If the user is a voter
+                        print("\n1: View Candidates\n2: Vote\n3: Logout")
+                        user_choice = input("Choose an action: ")
+                        if user_choice == '1':
+                            message = f"view_candidates|{username}"
+                            reply = TCPclient(message).run_client()
+                            print(reply)  # Display candidates or response
+                        elif user_choice == '2':
+                            candidate_name = input("Enter candidate name to vote: ")
+                            message = f"vote|{username}|{candidate_name}"
+                            reply = TCPclient(message).run_client()
+                            if "Vote successful" in reply:
+                                print("Your vote has been recorded.")
+                            else:
+                                print(reply)  # Print error message if voting fails
+                        elif user_choice == '3':
+                            print("Logging out...")
+                            break
+                        else:
+                            print("Invalid option. Please choose again.")
+            else:
+                print("Login failed.")
+                continue
+
+        elif choice == '3':
+            print("Exiting the application.")
+            break
+        else:
+            print("Invalid option, please choose 1, 2, or 3.")
