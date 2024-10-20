@@ -1,7 +1,7 @@
 import socket
 
 
-class TCPclient():
+class TCPclient:
     def __init__(self, sms):
         self.target_ip = "localhost"
         self.target_port = 8080
@@ -33,10 +33,7 @@ if __name__ == "__main__":
 
             message = f"register|{username}|{password}|{role}"
             reply = TCPclient(message).run_client()
-            if "Registration successful" in reply:
-                print("Registration successful, you can now login.")
-            else:
-                print(reply)
+            print(reply)
 
         elif choice == '2':
             # Login
@@ -46,7 +43,6 @@ if __name__ == "__main__":
             message = f"login|{username}|{password}"
             reply = TCPclient(message).run_client()
 
-            # Parse the server response to extract the role
             if "Login successful" in reply:
                 role = reply.split('|')[-1]
                 print(f"Welcome, {username}. You are logged in as {role}.")
@@ -59,17 +55,17 @@ if __name__ == "__main__":
                         if admin_choice == '1':
                             message = f"admin|{username}|view|"
                             reply = TCPclient(message).run_client()
-                            print(reply)  # Display candidates or response
+                            print(reply)
                         elif admin_choice == '2':
                             candidate_name = input("Enter candidate name: ")
                             message = f"admin|{username}|add|{candidate_name}"
                             reply = TCPclient(message).run_client()
-                            print(reply)  # Display response
+                            print(reply)
                         elif admin_choice == '3':
                             candidate_name = input("Enter candidate name to remove: ")
                             message = f"admin|{username}|remove|{candidate_name}"
                             reply = TCPclient(message).run_client()
-                            print(reply)  # Display response
+                            print(reply)
                         elif admin_choice == '4':
                             print("Logging out...")
                             break
@@ -79,28 +75,25 @@ if __name__ == "__main__":
                         print("\n1: View Candidates\n2: Vote\n3: Logout")
                         user_choice = input("Choose an action: ")
                         if user_choice == '1':
-                            message = f"view_candidates|{username}"
+                            message = f"view_candidates|{username}|"
                             reply = TCPclient(message).run_client()
-                            print(reply)  # Display candidates or response
+                            print(reply)
                         elif user_choice == '2':
-                            candidate_name = input("Enter candidate name to vote: ")
+                            candidate_name = input("Enter candidate name to vote for: ")
                             message = f"vote|{username}|{candidate_name}"
                             reply = TCPclient(message).run_client()
-                            if "Vote successful" in reply:
-                                print("Your vote has been recorded.")
-                            else:
-                                print(reply)  # Print error message if voting fails
+                            print(reply)
                         elif user_choice == '3':
                             print("Logging out...")
                             break
                         else:
                             print("Invalid option. Please choose again.")
             else:
-                print("Login failed.")
-                continue
+                print(reply)
 
         elif choice == '3':
-            print("Exiting the application.")
+            print("Exiting...")
             break
+
         else:
-            print("Invalid option, please choose 1, 2, or 3.")
+            print("Invalid choice. Please try again.")
