@@ -17,11 +17,11 @@ class TCPserver:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((self.server_ip, self.server_port))
         server.listen()
-        print("Server listening on port: {} and IP: {}".format(self.server_port, self.server_ip))
+        print(f"Server listening on port: {self.server_port} and IP: {self.server_ip}")
         try:
             while True:
                 client, address = server.accept()
-                print("Accepted connection from {}:{}".format(address[0], address[1]))
+                print(f"Accepted connection from {address[0]}:{address[1]}")
                 self.handle_client(client)
         except Exception as err:
             print("Error: ", err)
@@ -29,7 +29,7 @@ class TCPserver:
     def handle_client(self, client_socket):
         with client_socket as sock:
             request = sock.recv(1024).decode("utf-8")
-            print("Received: {}".format(request))
+            print(f"Received: {request}")
 
             if request.startswith("register"):
                 self.register(sock, request)
@@ -119,19 +119,21 @@ class TCPserver:
     def handle_admin(self, sock, request):
         """Handles admin actions such as adding/removing candidates."""
         try:
-            action, username, *args = request.split("|")
+            role, username, action, *args = request.split("|")
             user = users_collection.find_one({"username": username})
 
             if user is None or user["role"] != "admin":
                 sock.send("Access denied. Admins only.".encode("utf-8"))
                 return
 
-            if action == "1":  # Add candidate
+            if action == "add":  # Add candidate
+                print("this is add")
                 candidate_name = args[0] if args else ""
                 candidates_collection.insert_one({"name": candidate_name, "votes": 0})
                 sock.send(f"Candidate {candidate_name} added.".encode("utf-8"))
 
-            elif action == "2":  # Remove candidate
+            elif action == "remove":  # Remove candidate
+                print("this is remove")
                 candidate_name = args[0] if args else ""
                 result = candidates_collection.delete_one({"name": candidate_name})
                 if result.deleted_count > 0:
@@ -139,7 +141,8 @@ class TCPserver:
                 else:
                     sock.send(f"Candidate {candidate_name} not found.".encode("utf-8"))
 
-            elif action == "3":  # View candidates
+            elif action == "view":  # View candidates
+                print("this is view")
                 candidates = list(candidates_collection.find({}))
                 if not candidates:
                     sock.send("No candidates available.".encode("utf-8"))
